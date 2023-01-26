@@ -13,8 +13,9 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
-import org.springframework.security.web.server.csrf.CookieServerCsrfTokenRepository;
+import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
+
+import java.util.concurrent.TimeUnit;
 
 import static com.example.springsecurity.security.ApplicationUserRole.*;
 import static org.springframework.security.config.Customizer.withDefaults;
@@ -40,8 +41,6 @@ public class ApplicationSecurityConfig {
                 //.csrf().csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                 //.and()
                 .csrf().disable()
-                .httpBasic()
-                .and()
                 .authorizeHttpRequests((authz) -> authz
                                 .dispatcherTypeMatchers(DispatcherType.FORWARD).permitAll()
                                 //requestMatcher is the same as antMatcher (antMatcher was the name in previous versions)
@@ -56,17 +55,26 @@ public class ApplicationSecurityConfig {
                                 .anyRequest()
                                 .authenticated()
                 )
-                .httpBasic(withDefaults());
-
-        //It can be done in this way also!!
-
-/*                .authorizeHttpRequests()
-                .requestMatchers("/", "index", "/css/*", "/js/*")
-                .permitAll()
-                .anyRequest()
-                .authenticated()
+                .formLogin()
+                    .loginPage("/login")
+                    .permitAll()
+                    .defaultSuccessUrl("/courses", true)
+                    .passwordParameter("password")
+                    .usernameParameter("username")
                 .and()
-                .httpBasic();*/
+                .rememberMe()
+                    .tokenValiditySeconds((int) TimeUnit.DAYS.toSeconds(21)) // defaults to 2 weeks
+                    .key("something-very-secured") // added additional key for hashing the username and expiration-date (default is just username and expiration-date)
+                    .rememberMeParameter("remember-me")
+                .and()
+                .logout()
+                    .logoutUrl("/logout")
+                    // if csrf is enabled the line below should be removed, and the http method for logout should be POST
+                    .logoutRequestMatcher(new AntPathRequestMatcher("/logout", "GET"))
+                    .clearAuthentication(true)
+                    .invalidateHttpSession(true)
+                    .deleteCookies("JSESSIONID", "remember-me")
+                    .logoutSuccessUrl("/login");
 
         return http.build();
     }
